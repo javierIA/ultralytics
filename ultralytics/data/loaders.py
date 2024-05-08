@@ -92,7 +92,7 @@ class LoadStreams:
                     "'source=0' webcam not supported in Colab and Kaggle notebooks. "
                     "Try running 'source=0' in a local environment."
                 )
-            self.caps[i] = cv2.VideoCapture(s)  # store video capture object
+            self.caps[i] = cv2.VideoCapture(s,cv2.CAP_GSTREAMER)  # store video capture object
             if not self.caps[i].isOpened():
                 raise ConnectionError(f"{st}Failed to open {s}")
             w = int(self.caps[i].get(cv2.CAP_PROP_FRAME_WIDTH))
