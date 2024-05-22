@@ -10,21 +10,13 @@ from ultralytics import YOLO
 from ultralytics.utils import ASSETS, WEIGHTS_DIR
 from ultralytics.cfg import TASK2DATA, TASK2MODEL, TASKS
 
-from . import CUDA_DEVICE_COUNT, CUDA_IS_AVAILABLE, MODEL, SOURCE
+from tests import CUDA_DEVICE_COUNT, CUDA_IS_AVAILABLE, MODEL, SOURCE
 
 
 def test_checks():
     """Validate CUDA settings against torch CUDA functions."""
     assert torch.cuda.is_available() == CUDA_IS_AVAILABLE
     assert torch.cuda.device_count() == CUDA_DEVICE_COUNT
-
-
-@pytest.mark.slow
-@pytest.mark.skipif(not CUDA_IS_AVAILABLE, reason="CUDA is not available")
-def test_export_engine():
-    """Test exporting the YOLO model to NVIDIA TensorRT format."""
-    f = YOLO(MODEL).export(format="engine", device=0)
-    YOLO(f)(SOURCE, device=0)
 
 
 @pytest.mark.slow
@@ -49,6 +41,7 @@ def test_export_engine_matrix(task, dynamic, int8, half, batch):
         half=half,
         batch=batch,
         data=TASK2DATA[task],
+        workspace=1,  # reduce workspace GB for less resource utilization during testing
     )
     YOLO(file)([SOURCE] * batch, imgsz=64 if dynamic else 32)  # exported model inference
     Path(file).unlink()  # cleanup
