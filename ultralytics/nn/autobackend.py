@@ -17,6 +17,7 @@ from PIL import Image
 from ultralytics.utils import ARM64, IS_JETSON, IS_RASPBERRYPI, LINUX, LOGGER, ROOT, yaml_load
 from ultralytics.utils.checks import check_requirements, check_suffix, check_version, check_yaml
 from ultralytics.utils.downloads import attempt_download_asset, is_url
+import openvino.properties as props
 
 
 def check_class_names(names):
@@ -198,25 +199,37 @@ class AutoBackend(nn.Module):
             LOGGER.info(f"Loading {w} for OpenVINO inference...")
             check_requirements("openvino>=2024.0.0")
             import openvino as ov
-
             core = ov.Core()
+            
             w = Path(w)
             if not w.is_file():  # if not *.xml
                 w = next(w.glob("*.xml"))  # get *.xml file from *_openvino_model dir
+
+            # Set the cache directory within the model's folder
+            path_to_cache_dir = w.parent / "cache"
+            path_to_cache_dir.mkdir(exist_ok=True)
+            core.set_property({props.cache_dir: str(path_to_cache_dir)})
+
             ov_model = core.read_model(model=str(w), weights=w.with_suffix(".bin"))
+            
             if ov_model.get_parameters()[0].get_layout().empty:
                 ov_model.get_parameters()[0].set_layout(ov.Layout("NCHW"))
 
             # OpenVINO inference modes are 'LATENCY', 'THROUGHPUT' (not recommended), or 'CUMULATIVE_THROUGHPUT'
             inference_mode = "CUMULATIVE_THROUGHPUT" if batch > 1 else "LATENCY"
             LOGGER.info(f"Using OpenVINO {inference_mode} mode for batch={batch} inference...")
+
+            # Compile the model with caching
             ov_compiled_model = core.compile_model(
-                ov_model,
+                model=ov_model,
                 device_name="AUTO",  # AUTO selects best available device, do not modify
-                config={"PERFORMANCE_HINT": inference_mode},
+                config={"PERFORMANCE_HINT": inference_mode}
             )
+            
             input_name = ov_compiled_model.input().get_any_name()
             metadata = w.parent / "metadata.yaml"
+
+   
 
         # TensorRT
         elif engine:
